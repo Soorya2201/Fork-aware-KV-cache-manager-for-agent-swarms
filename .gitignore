@@ -20,3 +20,4 @@ slurm/carc.env
 
 # Private correspondence
 docs/permission_email.md
+data/
