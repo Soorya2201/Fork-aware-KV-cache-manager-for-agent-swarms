@@ -173,6 +173,27 @@ anything. In this workload agents of the same session share almost no radix bloc
 prompt starts with its own system prompt), so P′ ≈ 0. P′ matters for engines and apps where
 siblings share a common transcript prefix.
 
+### 5.4 Budget mode: a fixed pool has no memory price
+
+When the pool is a fixed budget and unused memory is simply idle, pricing memory at c_mem
+answers the wrong question. The constraint is what matters, and λ in section 5 is whatever
+keeps the pool full. The policies therefore switch rules in budget mode:
+- Pin every idle agent until a safe bound on its predicted return (1.2 × the largest gap seen
+  for that agent in other sessions).
+- Keep every block the next call might reuse (the largest fork point seen), and drop only the
+  tail that is certainly dead.
+- When the pool is full, unpin the agent predicted to return last.
+
+In a turn-based app the return order is almost deterministic, so this approximates Belady.
+On the CARC V100 trace at a 1 GB pool, hit rate rises from 6% (LRU) to 30%, against 37% for
+Belady.
+
+On that GPU, prefill runs at about 5,400 tokens/s, so at the full 12.7 GB pool the break-even
+time τ is about 44 s. That is shorter than the 56 s it takes the other 12 agents to speak. When
+memory has a price, evicting immediately is optimal for this app, and the distribution-aware
+threshold learns it: its cost equals the oracle's. Deterministic ski rental waits τ and then
+evicts anyway, which costs 1.8×, close to its worst case of 2.
+
 ## 6. Third option: compress (Phase 5)
 
 Quantizing the idle KV to INT8 (or FP8) halves the rent (`r/2` relative to fp16) at a one-time

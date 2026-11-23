@@ -28,3 +28,9 @@ a tool-using workload; the schema supports them.
 
 Timing depends on the serving hardware. A Mac trace (Ollama, Qwen2.5-0.5B) and a CARC trace
 (SGLang, Qwen2.5-7B) share structure and token counts but not gap lengths.
+
+## Traces rebuilt from server logs
+
+`trace/from_vllm_log.py` builds the same format from a vLLM request log. Those traces add
+`output_tokens_estimated: true`: output counts come from duration × decode rate, calibrated to
+vLLM's counters, and output blocks use placeholder token ids. Timestamps have 1 s resolution.

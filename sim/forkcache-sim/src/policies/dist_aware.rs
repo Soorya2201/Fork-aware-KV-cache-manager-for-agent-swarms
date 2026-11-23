@@ -21,11 +21,20 @@ pub struct DistAware {
     per_agent: bool,
     alpha: Option<f64>,
     cache: HashMap<(u32, u32), (Vec<f64>, Vec<f64>)>,
+    /// Budget mode (fixed pool, memory has no price): pin every idle agent until a
+    /// safe upper bound on its predicted return and, under pressure, unpin the one
+    /// predicted to return last (per-agent Belady, paper/model.md section 5).
+    pub budget_mode: bool,
 }
 
 impl DistAware {
     pub fn new(samples: Vec<(u32, u32, f64)>, per_agent: bool, alpha: Option<f64>) -> Self {
-        DistAware { samples, per_agent, alpha, cache: HashMap::new() }
+        DistAware { samples, per_agent, alpha, cache: HashMap::new(), budget_mode: false }
+    }
+
+    pub fn budget(mut self, on: bool) -> Self {
+        self.budget_mode = on;
+        self
     }
 
     fn dist(&mut self, session: u32, agent: u32) -> &(Vec<f64>, Vec<f64>) {
@@ -84,6 +93,14 @@ impl EvictionPolicy for DistAware {
     }
 
     fn on_idle(&mut self, ctx: &IdleCtx) -> Hold {
+        if self.budget_mode {
+            let (g, _) = self.dist(ctx.session, ctx.agent);
+            return match g.last() {
+                // predicted return within the largest gap seen for this agent (+20%)
+                Some(&max_gap) => Hold::PinUntil(ctx.now + 1.2 * max_gap + 1e-6),
+                None => Hold::Release,
+            };
+        }
         let tau = ctx.tau();
         let alpha = self.alpha;
         let (g, pre) = self.dist(ctx.session, ctx.agent);

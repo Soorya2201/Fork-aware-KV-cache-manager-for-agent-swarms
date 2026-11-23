@@ -45,17 +45,17 @@ pub fn make_policies(name: &str, w: &Workload, cost_mode: bool, ttls: &[f64], se
         "ski_rental" => vec![Box::new(SkiRental)],
         "ski_rental_rand" => vec![Box::new(SkiRentalRandom::new(seed))],
         "continuum_style" => vec![Box::new(ContinuumStyle::new(8, 1.25))],
-        "dist_aware" => vec![Box::new(DistAware::new(gap_samples(w), false, None))],
-        "dist_aware_agent" => vec![Box::new(DistAware::new(gap_samples(w), true, None))],
-        "dist_aware_agent_robust" => vec![Box::new(DistAware::new(gap_samples(w), true, Some(3.0)))],
+        "dist_aware" => vec![Box::new(DistAware::new(gap_samples(w), false, None).budget(!cost_mode))],
+        "dist_aware_agent" => vec![Box::new(DistAware::new(gap_samples(w), true, None).budget(!cost_mode))],
+        "dist_aware_agent_robust" => vec![Box::new(DistAware::new(gap_samples(w), true, Some(3.0)).budget(!cost_mode))],
         "oracle" => vec![Box::new(Oracle { cost_mode })],
-        "fa_ski_rental" => vec![Box::new(ForkAware::new(SkiRental, ForkPoint::Predict(reuse_samples(w))))],
+        "fa_ski_rental" => vec![Box::new(ForkAware::new(SkiRental, ForkPoint::Predict(reuse_samples(w))).budget(!cost_mode))],
         "fa_ski_rental_rand" =>
-            vec![Box::new(ForkAware::new(SkiRentalRandom::new(seed), ForkPoint::Predict(reuse_samples(w))))],
+            vec![Box::new(ForkAware::new(SkiRentalRandom::new(seed), ForkPoint::Predict(reuse_samples(w))).budget(!cost_mode))],
         "fa_dist_aware_agent" => vec![Box::new(ForkAware::new(
-            DistAware::new(gap_samples(w), true, None), ForkPoint::Predict(reuse_samples(w))))],
+            DistAware::new(gap_samples(w), true, None).budget(!cost_mode), ForkPoint::Predict(reuse_samples(w))).budget(!cost_mode))],
         "fa_dist_aware_agent_robust" => vec![Box::new(ForkAware::new(
-            DistAware::new(gap_samples(w), true, Some(3.0)), ForkPoint::Predict(reuse_samples(w))))],
+            DistAware::new(gap_samples(w), true, Some(3.0)).budget(!cost_mode), ForkPoint::Predict(reuse_samples(w))).budget(!cost_mode))],
         "fa_oracle" => vec![Box::new(ForkAware::new(Oracle { cost_mode }, ForkPoint::Oracle))],
         other => panic!("unknown policy {other}; known: {ALL_POLICIES:?}"),
     }

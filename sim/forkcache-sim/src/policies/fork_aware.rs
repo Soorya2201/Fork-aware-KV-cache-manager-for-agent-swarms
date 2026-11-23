@@ -33,12 +33,20 @@ pub struct ForkAware<P: EvictionPolicy> {
     pub inner: P,
     pub fork: ForkPoint,
     last_keep: usize,
+    /// Budget mode: memory has no price, so keep every block the next call might
+    /// reuse (the largest fork point seen) and drop only the tail that is dead.
+    pub budget_mode: bool,
     fit: HashMap<(u32, u32, u32), (Vec<f64>, f64)>,
 }
 
 impl<P: EvictionPolicy> ForkAware<P> {
     pub fn new(inner: P, fork: ForkPoint) -> Self {
-        ForkAware { inner, fork, last_keep: usize::MAX, fit: HashMap::new() }
+        ForkAware { inner, fork, last_keep: usize::MAX, budget_mode: false, fit: HashMap::new() }
+    }
+
+    pub fn budget(mut self, on: bool) -> Self {
+        self.budget_mode = on;
+        self
     }
 
     /// Kept prefix length in blocks.
@@ -63,6 +71,10 @@ impl<P: EvictionPolicy> ForkAware<P> {
         let n = ctx.n_blocks;
         let bt = ctx.block_tokens;
         let reuse: Vec<f64> = fracs.iter().map(|f| f * n as f64).collect();
+        if self.budget_mode {
+            let hi = reuse.iter().cloned().fold(0.0, f64::max);
+            return ((hi.ceil() as usize) + 1).min(n);
+        }
         // Expected cost of keeping k blocks: rent on k blocks for the expected gap,
         // plus recompute of whatever the next call reuses beyond k.
         let cost = |k: usize| -> f64 {
