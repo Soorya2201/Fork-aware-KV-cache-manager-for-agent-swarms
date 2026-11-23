@@ -53,6 +53,28 @@ impl Cache {
         }
     }
 
+    /// Tokens at the end of `seq` that only this sequence holds: cached, not
+    /// active, not pinned, and with no cached child outside `seq`. Because eviction
+    /// is leaf-only, these blocks form a suffix; everything before it stays cached
+    /// for as long as some other agent or request holds it.
+    pub fn exclusive_suffix_tokens(&self, seq: &[u32]) -> u64 {
+        let mut tokens = 0u64;
+        let mut own_child = 0u32;
+        for &b in seq.iter().rev() {
+            let i = b as usize;
+            if !self.cached[i] {
+                own_child = 0;
+                continue;
+            }
+            if self.active[i] != 0 || self.pins[i] != 0 || self.cached_children[i] > own_child {
+                break;
+            }
+            tokens += self.meta[i].tokens as u64;
+            own_child = 1;
+        }
+        tokens
+    }
+
     #[inline]
     pub fn is_cached(&self, b: u32) -> bool {
         self.cached[b as usize]

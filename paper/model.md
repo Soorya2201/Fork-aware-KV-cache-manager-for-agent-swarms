@@ -130,6 +130,49 @@ A turn-based workload makes one failure obvious: **LRU evicts exactly the agent 
 next** (the one idle longest), so on a round-robin pattern larger than the pool it gets zero
 hits. The hand-made test `lru_thrashes_on_round_robin_and_belady_does_not` checks this.
 
+### 5.3 Fork-aware: keep only the prefix the next call will reuse
+
+Sections 2–4 treat an idle agent's KV as one item of size L. It is not. The agent's next
+prompt forks off the old context at some point K ≤ L, and only the blocks before K can hit.
+In the measured workload the app rebuilds a windowed history every turn, so the next call
+reuses a median of 48% of the old context (P10 35%, P90 77%), and the fraction is stable per
+round (standard deviation about 0.1). Keeping the tail past K pays rent and saves nothing.
+
+The decision therefore has two parts.
+
+1. **Where to cut (K).** With R(K→K') = b(K'−K) + c(K'²−K²) the cost of recomputing tokens
+   K..K' on top of a cached prefix of K tokens, and T the gap, keeping a prefix of k tokens
+   costs, in expectation over the fork point K*,
+
+   ```
+   F(k) = c_mem · k · E[T]  +  E[ R(k → K*) · 1[K* > k] ].
+   ```
+
+   The first term grows linearly and the second is a decreasing convex function of k, so this
+   is a newsvendor problem. The minimum lies at k = 0, at k = L, or at one of the observed fork
+   points. It is fitted per (agent, round) on the other sessions only (leave one session out).
+
+2. **How long to keep it.** Apply any threshold rule from sections 2–4 to the kept prefix,
+   with its marginal costs. Of the kept prefix, the part P′ that siblings also hold stays
+   cached anyway, so
+
+   ```
+   rent = c_mem (k − P′),   buy = R(P′ → k).
+   ```
+
+   The guarantees of sections 2–3 carry over to the kept prefix unchanged, because they are
+   statements about any rent/buy pair.
+
+The tail is released at once. The policy `fa_<rule>` in the simulator does this.
+`fa_oracle_true_fork` knows the true K* and the true gap, and lower-bounds it.
+
+On the Mac trace, this step accounts for the whole gain over the earlier
+`dist_aware_agent`. With full-context costs, even the per-episode oracle loses to a 10 s TTL
+at large pools. The TTL wins because it drops the dead tail early, not because it predicts
+anything. In this workload agents of the same session share almost no radix blocks (each
+prompt starts with its own system prompt), so P′ ≈ 0. P′ matters for engines and apps where
+siblings share a common transcript prefix.
+
 ## 6. Third option: compress (Phase 5)
 
 Quantizing the idle KV to INT8 (or FP8) halves the rent (`r/2` relative to fp16) at a one-time

@@ -122,3 +122,44 @@ fn best_threshold_matches_brute_force() {
         }
     }
 }
+
+/// Two agents share a 4-block prefix; each adds 2 private blocks. While B is
+/// still running, idle A exclusively holds only its 2 private blocks (32 tokens).
+/// Once B is idle and pinned, A's exclusive part is still those 2 blocks.
+#[test]
+fn exclusive_suffix_counts_only_private_blocks() {
+    use forkcache_sim::radix::{Cache, Order};
+    use forkcache_sim::trace::BlockMeta;
+    // blocks 0-3 shared chain, 4-5 A's suffix (parent 3), 6-7 B's suffix (parent 3)
+    let parent = [None, Some(0), Some(1), Some(2), Some(3), Some(4), Some(3), Some(6)];
+    let depth = [0, 1, 2, 3, 4, 5, 4, 5];
+    let meta: Vec<BlockMeta> = (0..8).map(|i| BlockMeta { parent: parent[i], tokens: 16, depth: depth[i] }).collect();
+    let mut cache = Cache::new(meta, Order::Lru, Vec::new());
+    let a = [0u32, 1, 2, 3, 4, 5];
+    let b = [0u32, 1, 2, 3, 6, 7];
+    for &x in a.iter().chain(&b[4..]) {
+        cache.insert(x);
+    }
+    for &x in &b {
+        cache.active[x as usize] += 1;
+    }
+    assert_eq!(cache.exclusive_suffix_tokens(&a), 32);
+    // B finishes and is pinned: shared prefix is still held by B's pins.
+    for &x in &b {
+        cache.active[x as usize] -= 1;
+        cache.pins[x as usize] += 1;
+    }
+    assert_eq!(cache.exclusive_suffix_tokens(&a), 32);
+    // B's KV is gone entirely: A now holds the whole chain alone.
+    for &x in &b {
+        cache.pins[x as usize] -= 1;
+    }
+    cache.evict(7);
+    cache.evict(6);
+    assert_eq!(cache.exclusive_suffix_tokens(&a), 96);
+    // Marginal recompute of the suffix on top of a cached prefix.
+    let curve = PrefillCurve { a: 0.0, b: 1e-3, c: 1e-7 };
+    let fa = curve.recompute_suffix(64, 32);
+    assert!((fa - (32e-3 + 1e-7 * (96.0f64 * 96.0 - 64.0 * 64.0))).abs() < 1e-12);
+    assert!(fa < curve.recompute(96));
+}

@@ -133,6 +133,8 @@ pub fn run(w: &Workload, cfg: &SimConfig, policy: &mut dyn EvictionPolicy) -> Me
             u.sort();
         }
     }
+    // Blocks of each call's context that the same agent's next call reuses (prefix match).
+    let true_reuse = reuse_blocks(w);
     let mut cache = Cache::new(w.blocks.clone(), if belady { Order::Belady } else { Order::Lru }, uses);
     let c_mem = 1.0 / cfg.pool_tokens as f64; // GPU-s per token-second: the whole pool for 1 s = 1 GPU-s
     let cap = if cfg.mode == Mode::Budget { Some(cfg.pool_tokens) } else { None };
@@ -277,10 +279,19 @@ pub fn run(w: &Workload, cfg: &SimConfig, policy: &mut dyn EvictionPolicy) -> Me
                     }
                     Some(gap) => {
                         let tokens = (c.prompt_tokens + c.output_tokens) as u64;
+                        let excl = cache.exclusive_suffix_tokens(&seq).min(tokens);
                         let ctx = IdleCtx {
                             now: t, session: c.session, agent: c.agent, round: c.round, tokens,
                             rent: c_mem * tokens as f64,
                             buy: cfg.curve.recompute(tokens),
+                            excl_tokens: excl,
+                            fa_rent: c_mem * excl as f64,
+                            fa_buy: cfg.curve.recompute_suffix(tokens - excl, excl),
+                            n_blocks: seq.len(),
+                            block_tokens: w.block_size as f64,
+                            c_mem,
+                            curve: cfg.curve,
+                            true_reuse_blocks: true_reuse[i],
                         };
                         let hold = if policy.wants_true_gap() {
                             policy.on_idle_with_gap(&ctx, gap)
@@ -305,6 +316,22 @@ pub fn run(w: &Workload, cfg: &SimConfig, policy: &mut dyn EvictionPolicy) -> Me
                             Hold::Release => (false, t),
                             Hold::PinUntil(d) => (true, d),
                             Hold::PinForever => (true, f64::INFINITY),
+                        };
+                        let keep = if pinned { policy.keep_prefix_blocks(&ctx).min(seq.len()) } else { seq.len() };
+                        let seq: Vec<u32> = if pinned && keep < seq.len() {
+                            if cfg.mode == Mode::Cost {
+                                // drop the dead tail now (pins on the prefix keep it alive)
+                                for &x in &seq[..keep] {
+                                    cache.pins[x as usize] += 1;
+                                }
+                                cache.free_unreferenced(&seq);
+                                for &x in &seq[..keep] {
+                                    cache.pins[x as usize] -= 1;
+                                }
+                            }
+                            seq[..keep].to_vec()
+                        } else {
+                            seq
                         };
                         if pinned {
                             for &x in &seq {
@@ -350,4 +377,18 @@ pub fn run(w: &Workload, cfg: &SimConfig, policy: &mut dyn EvictionPolicy) -> Me
     m.total_cost_gpu_s = m.mem_cost_gpu_s + m.prefill_gpu_s;
     m.competitive_ratio = if m.episode_opt > 0.0 { m.episode_cost / m.episode_opt } else { f64::NAN };
     m
+}
+
+/// For each call: leading blocks of its sequence that the same agent's next call
+/// has as its prompt prefix (0 for an agent's last call).
+pub fn reuse_blocks(w: &Workload) -> Vec<usize> {
+    let idx: HashMap<u64, usize> = w.calls.iter().enumerate().map(|(i, c)| (c.call_id, i)).collect();
+    let mut out = vec![0usize; w.calls.len()];
+    for (j, c) in w.calls.iter().enumerate() {
+        if let Some(p) = c.parent_call.and_then(|p| idx.get(&p).copied()) {
+            let (a, b) = (&w.seq_blocks[p], &w.seq_blocks[j][..w.n_prompt_blocks[j]]);
+            out[p] = a.iter().zip(b).take_while(|(x, y)| x == y).count();
+        }
+    }
+    out
 }

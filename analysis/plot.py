@@ -26,7 +26,9 @@ BASELINES = ["lru", "ttl_10s", "ttl_30s", "ttl_60s", "continuum_style", "ski_ren
 COLORS = {"lru": "#7f7f7f", "ttl_10s": "#c7c7c7", "ttl_30s": "#bcbd22", "ttl_60s": "#dbdb8d",
           "continuum_style": "#9467bd", "ski_rental": "#1f77b4", "ski_rental_rand": "#aec7e8",
           "dist_aware": "#ff9896", "dist_aware_agent": "#d62728",
-          "dist_aware_agent_robust3": "#ff7f0e", "oracle": "#2ca02c"}
+          "dist_aware_agent_robust3": "#ff7f0e", "oracle": "#2ca02c",
+          "fa_ski_rental": "#17becf", "fa_ski_rental_rand": "#9edae5", "fa_dist_aware_agent": "#8c1c13",
+          "fa_dist_aware_agent_robust3": "#e377c2", "fa_oracle": "#98df8a"}
 
 
 def ci95(x):
@@ -41,7 +43,10 @@ def main():
     ap.add_argument("--results", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--title", default="")
+    ap.add_argument("--proposed", default=None,
+                    help="policy under test (default: fa_dist_aware_agent if present, else dist_aware_agent)")
     args = ap.parse_args()
+    global PROPOSED
     os.makedirs(args.out, exist_ok=True)
     rows = [json.loads(l) for l in open(args.results) if l.strip()]
 
@@ -49,6 +54,8 @@ def main():
     data = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
     for r in rows:
         data[r["mode"]][r["policy"]][round(r["pool_gb"], 3)][r["seed"]] = r
+    names = {r["policy"] for r in rows}
+    PROPOSED = args.proposed or ("fa_dist_aware_agent" if "fa_dist_aware_agent" in names else "dist_aware_agent")
 
     import matplotlib
     matplotlib.use("Agg")

@@ -9,8 +9,8 @@ This repository builds the pieces needed to answer that on a real 13-agent workl
 | Part | What it is | Where | Status |
 |---|---|---|---|
 | 1. Workload trace | Per-call logger for a 13-agent negotiation system: token counts, fork tree, idle gaps, chained block hashes (no text) | `trace/` | Runs on a Mac (Ollama) and on GPU servers |
-| 2. Keep-or-evict math | Ski-rental model: 2-competitive threshold, e/(e−1) randomized, distribution-aware threshold, memory pressure | `paper/model.md` | Written; bounds checked numerically |
-| 3. Rust simulator | Radix-tree prefix cache plus 9 policies (LRU, TTL, ski rental, randomized, Continuum-style, distribution-aware, oracle), event-driven replay | `sim/forkcache-sim/` | Built, 6 known-answer tests pass |
+| 2. Keep-or-evict math | Ski-rental model: 2-competitive threshold, e/(e−1) randomized, distribution-aware threshold, memory pressure, and a fork-aware rule that keeps only the prefix the agent's next call will reuse | `paper/model.md` | Written; bounds checked numerically |
+| 3. Rust simulator | Radix-tree prefix cache plus 14 policies (LRU, TTL, ski rental, randomized, Continuum-style, distribution-aware, their fork-aware versions, and two oracles), event-driven replay | `sim/forkcache-sim/` | Built, 7 known-answer tests pass |
 | 4. SGLang integration | `skirental` and `distaware` radix eviction strategies, plugged in without forking SGLang | `sglang_ext/` | Logic tested; GPU run pending |
 | 5. Kernel | Triton decode attention that reads a shared prefix once per fork group, LSE-merged with per-fork suffixes; benchmark vs FlashInfer cascade | `kernels/` | Math verified on CPU; kernel run pending (needs CUDA) |
 | 5. Compression | INT8 / FP8 quantization of idle KV, checked for token agreement, accuracy and loops | `compression/` | Runs on a Mac (Qwen2.5-0.5B) |
