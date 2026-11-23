@@ -1,0 +1,22 @@
+# The 13-agent negotiation app is a teammate's private repository: never publish it here.
+zage/
+
+# Workload traces and anything derived from them stay local until the Zage PI approves release.
+trace/*.jsonl
+trace/*_meta.json
+results/
+
+# Environments, caches, build output
+.venv/
+.hf_cache/
+__pycache__/
+*.pyc
+sim/**/target/
+.DS_Store
+logs/
+
+# CARC account details
+slurm/carc.env
+
+# Private correspondence
+docs/permission_email.md
