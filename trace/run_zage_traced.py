@@ -26,7 +26,8 @@ import sys
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "zage"))
+ZAGE_DIR = os.environ.get("ZAGE_DIR", os.path.join(ROOT, "zage"))   # the agent app, used unmodified
+sys.path.insert(0, ZAGE_DIR)
 sys.path.insert(0, os.path.join(ROOT, "trace"))
 os.environ.setdefault("HF_HOME", os.path.join(ROOT, ".hf_cache"))
 

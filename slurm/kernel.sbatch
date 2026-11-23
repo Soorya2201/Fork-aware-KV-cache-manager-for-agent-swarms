@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=kernel
+#SBATCH --job-name=fc_kernel
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=01:00:00

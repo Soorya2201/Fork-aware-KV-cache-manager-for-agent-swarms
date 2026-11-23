@@ -1,15 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=trace_7b
+#SBATCH --job-name=fc_trace7b
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=04:00:00
+#SBATCH --time=05:00:00
 #SBATCH --output=logs/%x_%j.out
-# Re-record the 13-agent trace on a GPU with Qwen2.5-7B, so idle gaps reflect real
-# GPU-speed serving (the Mac trace uses a 0.5B model on Ollama). Needs zage/ copied to $PROJ.
+# More 7B sessions for tighter confidence intervals: runs the agent app in $ZAGE_DIR
+# (unmodified) against SGLang with the trace logger. Prefix cache off, like the V100 run.
 set -euo pipefail
 source slurm/lib.sh
-start_server "logs/sglang_trace_${SLURM_JOB_ID}.log" --enable-cache-report
+start_server "logs/sglang_trace_${SLURM_JOB_ID}.log" --disable-radix-cache
+mkdir -p results/trace_7b results/private
 python trace/run_zage_traced.py --sessions "${SESSIONS:-20}" --rounds "${ROUNDS:-6}" \
   --base-url "http://127.0.0.1:$PORT/v1" --model "$MODEL" \
-  --raw "trace/raw_calls_7b_${SLURM_JOB_ID}.jsonl" --out "trace/zage_trace_7b.jsonl"
+  --raw "results/trace_7b/raw_${SLURM_JOB_ID}.jsonl" \
+  --out "results/trace_7b/zage_trace_7b_${GPU}_${SLURM_JOB_ID}.jsonl"
 stop_server

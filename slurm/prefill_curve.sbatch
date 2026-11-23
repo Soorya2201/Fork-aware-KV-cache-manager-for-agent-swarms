@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=prefill_curve
+#SBATCH --job-name=fc_prefill
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=01:00:00

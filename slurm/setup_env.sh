@@ -1,7 +1,5 @@
 #!/bin/bash
-# One-time environment setup. Run INSIDE a GPU allocation so the CUDA build matches:
-#   salloc --partition=gpu --gres=gpu:a100:1 --cpus-per-task=8 --mem=64G --time=1:00:00 --account=<pi>_123
-#   bash slurm/setup_env.sh
+# Environment setup (called by setup.sbatch inside a GPU job so the CUDA build matches).
 set -euo pipefail
 source "$(dirname "$0")/carc.env"
 cd "$PROJ"
@@ -11,6 +9,9 @@ uv venv --python 3.11 .venv
 source .venv/bin/activate
 uv pip install "sglang[all]"
 uv pip install pandas numpy matplotlib scipy orjson transformers jinja2 openai python-dotenv requests httpx
+# what the agent app itself imports (NOT its requirements.txt: those pin vllm 0.6.6 / torch 2.5
+# for V100 and would break SGLang)
+uv pip install python-docx huggingface_hub
 uvx --from huggingface_hub huggingface-cli download "$MODEL"
 python - <<'PY'
 import torch, sglang
