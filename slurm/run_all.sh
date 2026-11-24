@@ -50,7 +50,7 @@ skip kernel   || { k=$(sub kernel.sbatch "$after");              ids+=("$k");   
 skip compress || { c=$(sub compression.sbatch "$after");         ids+=("$c");       echo "fc_compress  $c"; }
 skip trace7b  || { t=$(sub trace_7b.sbatch "$after");            ids+=("$t");       echo "fc_trace7b   $t"; }
 if ! skip policies; then
-  dep="afterok:$setup"; [ -n "${prefill:-}" ] && dep="afterany:$prefill"
+  dep="afterok:$setup"; [ -n "${prefill:-}" ] && dep="afterok:$setup,afterany:$prefill"   # needs setup; runs even if prefill fails
   p=$(sub replay_policies.sbatch "--dependency=$dep"); ids+=("$p"); echo "fc_policies  $p"
 fi
 all=$(IFS=:; echo "${ids[*]:-$setup}")

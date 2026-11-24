@@ -12,7 +12,7 @@ source slurm/lib.sh
 TRACE=${TRACE:-$PRIVATE/trace/carc_v100_trace.jsonl}
 SCHEDULE=${SCHEDULE:-$PRIVATE/results/schedule_carc_v100.json}
 TIME_SCALE=${TIME_SCALE:-1}
-CURVE=${CURVE:-$(ls -t results/prefill/*_qwen7b_curve.json 2>/dev/null | head -1)}
+CURVE=${CURVE:-$(ls -t results/prefill/*_qwen7b_curve.json 2>/dev/null | head -1 || true)}   # no curve yet must not abort the job
 CURVE=${CURVE:-$PRIVATE/results/prefill/v100_qwen7b_from_log_curve.json}
 POOL_TOKENS=${POOL_TOKENS:-$PRESSURE_TOKENS}
 echo "curve: $CURVE  pool: $POOL_TOKENS tokens"
